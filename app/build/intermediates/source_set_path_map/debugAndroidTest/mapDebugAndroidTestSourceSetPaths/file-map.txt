@@ -1,0 +1,4 @@
+com.college.quizapp.test.app-androidTest-0 C:\Users\Aryaman singh\Desktop\CollegeQuizApp\app\build\generated\res\resValues\androidTest\debug
+com.college.quizapp.test.app-mergeDebugAndroidTestResources-1 C:\Users\Aryaman singh\Desktop\CollegeQuizApp\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
+com.college.quizapp.test.app-mergeDebugAndroidTestResources-2 C:\Users\Aryaman singh\Desktop\CollegeQuizApp\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
+com.college.quizapp.test.app-debugAndroidTest-3 C:\Users\Aryaman singh\Desktop\CollegeQuizApp\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources

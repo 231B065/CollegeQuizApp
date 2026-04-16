@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.college.quizapp-mergeDebugResources-56:/values-v16/values-v16.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\Aryaman singh\\.gradle\\caches\\9.0.0\\transforms\\6435e06a0cb5bdaf3c8607625bcad696\\transformed\\core-1.12.0\\res\\values-v16\\values-v16.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "65",
+                        "endOffsets": "116"
+                    }
+                }
+            ]
+        }
+    ]
+}

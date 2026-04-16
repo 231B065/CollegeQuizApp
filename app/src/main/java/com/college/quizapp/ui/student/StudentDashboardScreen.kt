@@ -37,12 +37,10 @@ fun StudentDashboardScreen(
 ) {
     val now = Timestamp.now()
     val activeQuizzes = uiState.quizzes.filter { quiz ->
-        quiz.isActive &&
-                quiz.startTime != null && quiz.endTime != null &&
-                quiz.startTime <= now && quiz.endTime >= now
+        quiz.isActive
     }
     val upcomingQuizzes = uiState.quizzes.filter { quiz ->
-        quiz.startTime != null && quiz.startTime > now
+        !quiz.isActive && quiz.startTime != null && quiz.startTime > now
     }
     val completedQuizIds = uiState.results.map { it.quizId }.toSet()
 

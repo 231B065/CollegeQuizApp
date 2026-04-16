@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "290535025322",
+    "project_id": "collegequizapp-35c6d",
+    "storage_bucket": "collegequizapp-35c6d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:290535025322:android:91f7f74ea52fb509763ed3",
+        "android_client_info": {
+          "package_name": "com.college.quizapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0E7ZpTSaUgS-1S6CB74so4qVHGbDlFQE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
