@@ -35,6 +35,7 @@ fun TeacherDashboardScreen(
     onNavigateToCreateQuiz: () -> Unit,
     onNavigateToManageBatches: () -> Unit,
     onNavigateToAttendance: () -> Unit,
+    onNavigateToAiQuiz: () -> Unit,
     onNavigateToQuizDetail: (Quiz) -> Unit,
     onSignOut: () -> Unit
 ) {
@@ -220,6 +221,85 @@ fun TeacherDashboardScreen(
                                 color = TextSecondary
                             )
                         }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = TextMuted
+                        )
+                    }
+                }
+            }
+
+            // AI Quiz Generator Button
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToAiQuiz() },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = DarkSurfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        Purple40.copy(alpha = 0.08f),
+                                        Teal60.copy(alpha = 0.05f)
+                                    )
+                                )
+                            )
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Purple40.copy(alpha = 0.3f), Teal60.copy(alpha = 0.2f))
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = Purple60,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "AI Quiz Generator",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "Generate questions with AI",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Purple40.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                "NEW",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Purple60,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
                         Icon(
                             Icons.Default.ChevronRight,
                             contentDescription = null,

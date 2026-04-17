@@ -40,7 +40,8 @@ fun CreateQuizScreen(
         startTime: Date,
         endTime: Date
     ) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    initialQuestions: List<Question> = emptyList()
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -48,9 +49,15 @@ fun CreateQuizScreen(
     var selectedBatchIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var questions by remember {
         mutableStateOf(
-            listOf(
-                QuestionDraft("MCQ", "", mutableListOf("", "", "", ""), 0)
-            )
+            if (initialQuestions.isNotEmpty()) {
+                initialQuestions.map { q ->
+                    QuestionDraft(q.type, q.text, q.options.toMutableList(), q.correctOptionIndex)
+                }
+            } else {
+                listOf(
+                    QuestionDraft("MCQ", "", mutableListOf("", "", "", ""), 0)
+                )
+            }
         )
     }
     var startDate by remember { mutableStateOf<Date?>(null) }

@@ -25,6 +25,8 @@ object Routes {
     const val QUIZ_HISTORY = "quiz_history"
     const val QUIZ_RESULT_DETAIL = "quiz_result_detail"
     const val STUDENT_ATTENDANCE = "student_attendance"
+    const val AI_QUIZ_INPUT = "ai_quiz_input"
+    const val AI_QUIZ_REVIEW = "ai_quiz_review"
 }
 
 @Composable
@@ -32,7 +34,8 @@ fun NavGraph(
     navController: NavHostController = rememberNavController(),
     authViewModel: AuthViewModel = viewModel(),
     teacherViewModel: TeacherViewModel = viewModel(),
-    studentViewModel: StudentViewModel = viewModel()
+    studentViewModel: StudentViewModel = viewModel(),
+    aiQuizViewModel: AiQuizViewModel = viewModel()
 ) {
     val authState by authViewModel.uiState.collectAsState()
     var selectedQuizForExam by remember { mutableStateOf<Quiz?>(null) }
@@ -93,6 +96,10 @@ fun NavGraph(
                 onNavigateToAttendance = {
                     navController.navigate(Routes.TEACHER_ATTENDANCE)
                 },
+                onNavigateToAiQuiz = {
+                    aiQuizViewModel.resetState()
+                    navController.navigate(Routes.AI_QUIZ_INPUT)
+                },
                 onNavigateToQuizDetail = {
                     teacherViewModel.selectQuiz(it)
                     navController.navigate(Routes.QUIZ_DETAIL)
@@ -110,6 +117,16 @@ fun NavGraph(
         composable(Routes.CREATE_QUIZ) {
             val user = authState.user ?: return@composable
             val state by teacherViewModel.uiState.collectAsState()
+            val aiState by aiQuizViewModel.uiState.collectAsState()
+
+            // Get AI-generated questions if coming from AI flow
+            val aiQuestions = remember(aiState.generationComplete) {
+                if (aiState.generationComplete) {
+                    aiQuizViewModel.getSelectedQuestions()
+                } else {
+                    emptyList()
+                }
+            }
 
             CreateQuizScreen(
                 user = user,
@@ -120,7 +137,8 @@ fun NavGraph(
                         t, d, user.id, user.name, b, q, dur, s, e
                     )
                 },
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                initialQuestions = aiQuestions
             )
         }
 
@@ -177,6 +195,52 @@ fun NavGraph(
                 },
                 onEndAttendance = {
                     teacherViewModel.endAttendanceSession()
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // ================= AI QUIZ GENERATOR =================
+
+        composable(Routes.AI_QUIZ_INPUT) {
+            val aiState by aiQuizViewModel.uiState.collectAsState()
+
+            AiQuizInputScreen(
+                uiState = aiState,
+                onTopicChange = { aiQuizViewModel.updateTopic(it) },
+                onDifficultyChange = { aiQuizViewModel.updateDifficulty(it) },
+                onQuestionCountChange = { aiQuizViewModel.updateQuestionCount(it) },
+                onGenerate = { aiQuizViewModel.generateQuestions() },
+                onClearError = { aiQuizViewModel.clearError() },
+                onNavigateBack = { navController.popBackStack() }
+            )
+
+            // Navigate to review screen when generation completes
+            LaunchedEffect(aiState.generationComplete) {
+                if (aiState.generationComplete && aiState.generatedQuestions.isNotEmpty()) {
+                    navController.navigate(Routes.AI_QUIZ_REVIEW)
+                }
+            }
+        }
+
+        composable(Routes.AI_QUIZ_REVIEW) {
+            val aiState by aiQuizViewModel.uiState.collectAsState()
+
+            AiQuizReviewScreen(
+                uiState = aiState,
+                onToggleQuestion = { aiQuizViewModel.toggleQuestion(it) },
+                onSelectAll = { aiQuizViewModel.selectAll() },
+                onDeselectAll = { aiQuizViewModel.deselectAll() },
+                onRegenerate = {
+                    aiQuizViewModel.retry()
+                    navController.popBackStack()
+                },
+                onCreateQuiz = {
+                    // Navigate to CreateQuizScreen with selected questions pre-filled
+                    navController.navigate(Routes.CREATE_QUIZ) {
+                        // Pop back to dashboard so the back stack is clean
+                        popUpTo(Routes.TEACHER_DASHBOARD) { inclusive = false }
+                    }
                 },
                 onNavigateBack = { navController.popBackStack() }
             )

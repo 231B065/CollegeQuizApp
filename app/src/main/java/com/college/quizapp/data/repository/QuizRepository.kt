@@ -257,7 +257,7 @@ class QuizRepository {
             if (BuildConfig.GEMINI_API_KEY.isNotEmpty()) {
                 try {
                     val generativeModel = GenerativeModel(
-                        modelName = "gemini-1.5-flash",
+                        modelName = "gemini-2.0-flash-lite",
                         apiKey = BuildConfig.GEMINI_API_KEY
                     )
 
