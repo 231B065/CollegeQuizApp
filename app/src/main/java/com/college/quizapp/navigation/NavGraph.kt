@@ -18,14 +18,12 @@ object Routes {
     const val CREATE_QUIZ = "create_quiz"
     const val MANAGE_BATCHES = "manage_batches"
     const val QUIZ_DETAIL = "quiz_detail"
-    const val STUDENT_REQUESTS = "student_requests"
     const val QUIZ_RESULTS = "quiz_results"
     const val TEACHER_ATTENDANCE = "teacher_attendance"
     const val STUDENT_DASHBOARD = "student_dashboard"
     const val TAKE_QUIZ = "take_quiz"
     const val QUIZ_HISTORY = "quiz_history"
     const val QUIZ_RESULT_DETAIL = "quiz_result_detail"
-    const val PENDING_APPROVAL = "pending_approval"
     const val STUDENT_ATTENDANCE = "student_attendance"
 }
 
@@ -42,10 +40,7 @@ fun NavGraph(
     val startDestination = if (authState.isLoggedIn) {
         when (authState.user?.role) {
             UserRole.TEACHER -> Routes.TEACHER_DASHBOARD
-            UserRole.STUDENT ->
-                if (authState.user?.isApproved == true)
-                    Routes.STUDENT_DASHBOARD
-                else Routes.PENDING_APPROVAL
+            UserRole.STUDENT -> Routes.STUDENT_DASHBOARD
             else -> Routes.LOGIN
         }
     } else Routes.LOGIN
@@ -84,7 +79,6 @@ fun NavGraph(
             LaunchedEffect(user.id) {
                 teacherViewModel.loadQuizzes(user.id)
                 teacherViewModel.loadBatches(user.id)
-                teacherViewModel.loadPendingStudents()
             }
 
             TeacherDashboardScreen(
@@ -102,9 +96,6 @@ fun NavGraph(
                 onNavigateToQuizDetail = {
                     teacherViewModel.selectQuiz(it)
                     navController.navigate(Routes.QUIZ_DETAIL)
-                },
-                onNavigateToRequests = {
-                    navController.navigate(Routes.STUDENT_REQUESTS)
                 },
                 onSignOut = {
                     teacherViewModel.stopAdvertising()
@@ -158,22 +149,6 @@ fun NavGraph(
                     navController.navigate(Routes.QUIZ_RESULTS)
                 },
                 onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Routes.STUDENT_REQUESTS) {
-            val state by teacherViewModel.uiState.collectAsState()
-
-            StudentRequestsScreen(
-                pendingStudents = state.pendingStudents,
-                isLoading = state.isLoading,
-                successMessage = state.successMessage,
-                onLoadRequests = { teacherViewModel.loadPendingStudents() },
-                onApproveStudent = { id, batch ->
-                    teacherViewModel.approveStudent(id, batch)
-                },
-                onNavigateBack = { navController.popBackStack() },
-                onClearSuccess = { teacherViewModel.clearSuccess() }
             )
         }
 
@@ -318,21 +293,6 @@ fun NavGraph(
                 quiz = state.currentQuiz,
                 isLoading = state.isLoading,
                 onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Routes.PENDING_APPROVAL) {
-            val user = authState.user ?: return@composable
-
-            PendingApprovalScreen(
-                user = user,
-                onSignOut = {
-                    authViewModel.signOut()
-                    navController.navigate(Routes.LOGIN) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                },
-                onRefresh = { authViewModel.refreshUser() }
             )
         }
     }

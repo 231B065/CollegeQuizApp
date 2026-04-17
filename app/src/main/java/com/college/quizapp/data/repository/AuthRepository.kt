@@ -33,6 +33,7 @@ class AuthRepository {
 
     /**
      * Register a new user with role and optional batch assignment.
+     * Students are immediately active — no approval required.
      */
     suspend fun signUp(
         email: String,
@@ -45,15 +46,12 @@ class AuthRepository {
             val result = auth.createUserWithEmailAndPassword(email, password).await()
             val uid = result.user?.uid ?: throw Exception("Registration failed")
 
-            val isApproved = role == UserRole.TEACHER
-
             val user = User(
                 id = uid,
                 email = email,
                 name = name,
                 role = role,
-                batchId = batchId,
-                isApproved = isApproved
+                batchId = batchId
             )
 
             usersCollection.document(uid).set(
@@ -63,9 +61,25 @@ class AuthRepository {
                     "name" to user.name,
                     "role" to user.role.name,
                     "batchId" to user.batchId,
-                    "isApproved" to user.isApproved
+                    "isApproved" to true // Always true for backward compatibility
                 )
             ).await()
+
+            // Increment batch student count immediately on registration
+            if (role == UserRole.STUDENT && batchId.isNotEmpty()) {
+                try {
+                    val batchRef = firestore.collection("batches").document(batchId)
+                    firestore.runTransaction { transaction ->
+                        val batchSnapshot = transaction.get(batchRef)
+                        if (batchSnapshot.exists()) {
+                            val currentCount = batchSnapshot.getLong("studentCount") ?: 0
+                            transaction.update(batchRef, "studentCount", currentCount + 1)
+                        }
+                    }.await()
+                } catch (_: Exception) {
+                    // Non-critical: batch count update failed, student is still registered
+                }
+            }
 
             Result.success(user)
         } catch (e: Exception) {
@@ -87,8 +101,7 @@ class AuthRepository {
             } catch (e: Exception) {
                 UserRole.STUDENT
             },
-            batchId = doc.getString("batchId") ?: "",
-            isApproved = doc.getBoolean("isApproved") ?: true // Default to true for existing users
+            batchId = doc.getString("batchId") ?: ""
         )
     }
 
@@ -110,63 +123,5 @@ class AuthRepository {
     fun signOut() {
         auth.signOut()
     }
-
-    /**
-     * Get pending students for a list of batch IDs.
-     */
-    suspend fun getPendingStudents(batchIds: List<String>): Result<List<User>> {
-        return try {
-            if (batchIds.isEmpty()) return Result.success(emptyList())
-
-            // Firestore 'in' queries are limited to 10 items. For simplicity, assuming teacher has <= 10 batches.
-            // If they have more, we'd need to batch the queries.
-            val snapshot = usersCollection
-                .whereEqualTo("role", UserRole.STUDENT.name)
-                .whereEqualTo("isApproved", false)
-                .whereIn("batchId", batchIds)
-                .get()
-                .await()
-
-            val users = snapshot.documents.map { doc ->
-                User(
-                    id = doc.id,
-                    email = doc.getString("email") ?: "",
-                    name = doc.getString("name") ?: "",
-                    role = UserRole.STUDENT,
-                    batchId = doc.getString("batchId") ?: "",
-                    isApproved = false
-                )
-            }
-            Result.success(users)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Approve a student to join a batch.
-     */
-    suspend fun approveStudent(studentId: String, batchId: String): Result<Unit> {
-        return try {
-            val userRef = usersCollection.document(studentId)
-            val batchRef = firestore.collection("batches").document(batchId)
-
-            firestore.runTransaction { transaction ->
-                val userSnapshot = transaction.get(userRef)
-                if (userSnapshot.exists() && userSnapshot.getBoolean("isApproved") != true) {
-                    transaction.update(userRef, "isApproved", true)
-                    
-                    // Increment batch count
-                    val batchSnapshot = transaction.get(batchRef)
-                    if (batchSnapshot.exists()) {
-                        val currentCount = batchSnapshot.getLong("studentCount") ?: 0
-                        transaction.update(batchRef, "studentCount", currentCount + 1)
-                    }
-                }
-            }.await()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
 }
+
