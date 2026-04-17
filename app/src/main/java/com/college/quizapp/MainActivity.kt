@@ -86,6 +86,14 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Android 13+ (API 33+) requires NEARBY_WIFI_DEVICES for Nearby Connections
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.NEARBY_WIFI_DEVICES)
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            }
+        }
+
         // Location is always needed for BLE scanning
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) {

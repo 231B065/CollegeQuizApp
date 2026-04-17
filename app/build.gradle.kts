@@ -90,4 +90,7 @@ dependencies {
 
     // 🔹 Generative AI (Gemini)
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    
+    // 🔹 Nearby Connections
+    implementation("com.google.android.gms:play-services-nearby:19.3.0")
 }

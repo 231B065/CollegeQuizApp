@@ -20,11 +20,13 @@ object Routes {
     const val QUIZ_DETAIL = "quiz_detail"
     const val STUDENT_REQUESTS = "student_requests"
     const val QUIZ_RESULTS = "quiz_results"
+    const val TEACHER_ATTENDANCE = "teacher_attendance"
     const val STUDENT_DASHBOARD = "student_dashboard"
     const val TAKE_QUIZ = "take_quiz"
     const val QUIZ_HISTORY = "quiz_history"
     const val QUIZ_RESULT_DETAIL = "quiz_result_detail"
     const val PENDING_APPROVAL = "pending_approval"
+    const val STUDENT_ATTENDANCE = "student_attendance"
 }
 
 @Composable
@@ -93,6 +95,9 @@ fun NavGraph(
                 },
                 onNavigateToManageBatches = {
                     navController.navigate(Routes.MANAGE_BATCHES)
+                },
+                onNavigateToAttendance = {
+                    navController.navigate(Routes.TEACHER_ATTENDANCE)
                 },
                 onNavigateToQuizDetail = {
                     teacherViewModel.selectQuiz(it)
@@ -183,6 +188,25 @@ fun NavGraph(
             )
         }
 
+        composable(Routes.TEACHER_ATTENDANCE) {
+            val user = authState.user ?: return@composable
+            val state by teacherViewModel.uiState.collectAsState()
+
+            TeacherAttendanceScreen(
+                user = user,
+                batches = state.batches,
+                activeSession = state.activeAttendanceSession,
+                isAdvertising = state.isAttendanceAdvertising,
+                onStartAttendance = { batchId ->
+                    teacherViewModel.startAttendanceSession(batchId, user.id, user.name)
+                },
+                onEndAttendance = {
+                    teacherViewModel.endAttendanceSession()
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         // ================= STUDENT =================
 
         composable(Routes.STUDENT_DASHBOARD) {
@@ -202,6 +226,9 @@ fun NavGraph(
                     studentViewModel.startQuiz(it)
                     navController.navigate(Routes.TAKE_QUIZ)
                 },
+                onNavigateToAttendance = {
+                    navController.navigate(Routes.STUDENT_ATTENDANCE)
+                },
                 onNavigateToHistory = {
                     navController.navigate(Routes.QUIZ_HISTORY)
                 },
@@ -210,6 +237,27 @@ fun NavGraph(
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(0) { inclusive = true }
                     }
+                }
+            )
+        }
+
+        composable(Routes.STUDENT_ATTENDANCE) {
+            val user = authState.user ?: return@composable
+            val state by studentViewModel.uiState.collectAsState()
+
+            StudentAttendanceScreen(
+                isDiscovering = state.isAttendanceDiscovering,
+                connectionStatus = state.attendanceConnectionStatus,
+                markedPresent = state.attendanceMarkedPresent,
+                onStartDiscovery = {
+                    studentViewModel.startAttendanceDiscovery(user.id, user.name)
+                },
+                onStopDiscovery = {
+                    studentViewModel.stopAttendanceDiscovery()
+                },
+                onNavigateBack = {
+                    studentViewModel.stopAttendanceDiscovery()
+                    navController.popBackStack()
                 }
             )
         }

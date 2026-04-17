@@ -7,6 +7,7 @@ import com.college.quizapp.ble.BLEBeaconScanner
 import com.college.quizapp.data.model.Quiz
 import com.college.quizapp.data.model.QuizResult
 import com.college.quizapp.data.repository.QuizRepository
+import com.college.quizapp.nearby.NearbyAttendanceManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -25,13 +26,19 @@ data class StudentUiState(
     val submissionResult: QuizResult? = null,
     val selectedResult: QuizResult? = null,
     val error: String? = null,
-    val timeRemainingSeconds: Long = 0L
+    val timeRemainingSeconds: Long = 0L,
+    // Attendance specific
+    val isAttendanceDiscovering: Boolean = false,
+    val attendanceConnectionStatus: String = "Not Connected",
+    val attendanceMarkedPresent: Boolean = false
 )
 
 class StudentViewModel : ViewModel() {
 
     private val quizRepository = QuizRepository()
     private var bleScanner: BLEBeaconScanner? = null
+    var nearbyAttendanceManager: NearbyAttendanceManager? = null
+        private set
 
     private val _uiState = MutableStateFlow(StudentUiState())
     val uiState: StateFlow<StudentUiState> = _uiState
@@ -40,7 +47,38 @@ class StudentViewModel : ViewModel() {
         if (bleScanner == null) {
             bleScanner = BLEBeaconScanner(context.applicationContext)
         }
+        if (nearbyAttendanceManager == null) {
+            nearbyAttendanceManager = NearbyAttendanceManager(context.applicationContext)
+            // Start observing attendance state changes
+            viewModelScope.launch {
+                nearbyAttendanceManager?.isDiscovering?.collect { discovering ->
+                    _uiState.value = _uiState.value.copy(isAttendanceDiscovering = discovering)
+                }
+            }
+            viewModelScope.launch {
+                nearbyAttendanceManager?.studentConnectionStatus?.collect { status ->
+                    _uiState.value = _uiState.value.copy(attendanceConnectionStatus = status)
+                }
+            }
+            viewModelScope.launch {
+                nearbyAttendanceManager?.studentMarkedPresent?.collect { marked ->
+                    _uiState.value = _uiState.value.copy(attendanceMarkedPresent = marked)
+                }
+            }
+        }
     }
+
+    // ================== ATTENDANCE ==================
+
+    fun startAttendanceDiscovery(studentId: String, studentName: String) {
+        nearbyAttendanceManager?.startDiscovering(studentId, studentName)
+    }
+
+    fun stopAttendanceDiscovery() {
+        nearbyAttendanceManager?.stopDiscovering()
+    }
+
+    // ================================================
 
     fun loadQuizzes(batchId: String) {
         viewModelScope.launch {
@@ -217,5 +255,6 @@ class StudentViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         bleScanner?.stopScanning()
+        nearbyAttendanceManager?.stopDiscovering()
     }
 }

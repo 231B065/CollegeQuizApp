@@ -9,8 +9,11 @@ import com.college.quizapp.data.model.Question
 import com.college.quizapp.data.model.User
 import com.college.quizapp.data.model.Quiz
 import com.college.quizapp.data.model.QuizResult
+import com.college.quizapp.data.model.AttendanceSession
 import com.college.quizapp.data.repository.QuizRepository
 import com.college.quizapp.data.repository.AuthRepository
+import com.college.quizapp.data.repository.AttendanceRepository
+import com.college.quizapp.nearby.NearbyAttendanceManager
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,26 +30,96 @@ data class TeacherUiState(
     val error: String? = null,
     val successMessage: String? = null,
     val isAdvertising: Boolean = false,
-    val pendingStudents: List<User> = emptyList()
+    val pendingStudents: List<User> = emptyList(),
+    // Attendance specific
+    val activeAttendanceSession: AttendanceSession? = null,
+    val isAttendanceAdvertising: Boolean = false
 )
 
 class TeacherViewModel : ViewModel() {
 
     private val quizRepository = QuizRepository()
     private val authRepository = AuthRepository()
+    private val attendanceRepository = AttendanceRepository()
+
     private var bleAdvertiser: BLEBeaconAdvertiser? = null
+    var nearbyAttendanceManager: NearbyAttendanceManager? = null
+        private set
 
     private val _uiState = MutableStateFlow(TeacherUiState())
     val uiState: StateFlow<TeacherUiState> = _uiState
 
     /**
-     * Initialize BLE advertiser with context.
+     * Initialize BLE advertiser and Nearby manager with context.
      */
     fun initBLE(context: Context) {
         if (bleAdvertiser == null) {
             bleAdvertiser = BLEBeaconAdvertiser(context.applicationContext)
         }
+        if (nearbyAttendanceManager == null) {
+            nearbyAttendanceManager = NearbyAttendanceManager(context.applicationContext).apply {
+                onStudentConnectedAndDataReceived = { studentId, studentName ->
+                    markStudentPresent(studentId, studentName)
+                }
+            }
+        }
     }
+
+    // ================== ATTENDANCE ==================
+
+    fun startAttendanceSession(batchId: String, teacherId: String, teacherName: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val result = attendanceRepository.createSession(batchId, teacherId)
+            result.onSuccess { session ->
+                _uiState.value = _uiState.value.copy(
+                    activeAttendanceSession = session,
+                    isLoading = false,
+                    isAttendanceAdvertising = true
+                )
+                // Begin Advertising via Nearby
+                nearbyAttendanceManager?.startAdvertising(teacherName, session.id)
+
+                // Start observing the session for live updates
+                observeAttendanceSession(session.id)
+            }.onFailure { e ->
+                _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
+            }
+        }
+    }
+
+    private fun observeAttendanceSession(sessionId: String) {
+        viewModelScope.launch {
+            attendanceRepository.getSessionFlow(sessionId).collect { session ->
+                if (session != null) {
+                    _uiState.value = _uiState.value.copy(activeAttendanceSession = session)
+                }
+            }
+        }
+    }
+
+    private fun markStudentPresent(studentId: String, studentName: String) {
+        val sessionId = _uiState.value.activeAttendanceSession?.id ?: return
+        viewModelScope.launch {
+            attendanceRepository.markStudentPresent(sessionId, studentId, studentName)
+        }
+    }
+
+    fun endAttendanceSession() {
+        val sessionId = _uiState.value.activeAttendanceSession?.id
+        if (sessionId != null) {
+            viewModelScope.launch {
+                attendanceRepository.endSession(sessionId)
+            }
+        }
+        nearbyAttendanceManager?.stopAdvertising()
+        _uiState.value = _uiState.value.copy(
+            activeAttendanceSession = null,
+            isAttendanceAdvertising = false
+        )
+    }
+
+    // ================================================
 
     /**
      * Load all quizzes created by this teacher.
@@ -251,7 +324,8 @@ class TeacherViewModel : ViewModel() {
      */
     fun stopAdvertising() {
         bleAdvertiser?.stopAdvertising()
-        _uiState.value = _uiState.value.copy(isAdvertising = false)
+        nearbyAttendanceManager?.stopAdvertising()
+        _uiState.value = _uiState.value.copy(isAdvertising = false, isAttendanceAdvertising = false)
     }
 
     fun clearError() {
@@ -265,5 +339,7 @@ class TeacherViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         bleAdvertiser?.stopAdvertising()
+        nearbyAttendanceManager?.stopAdvertising()
     }
 }
+

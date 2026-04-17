@@ -32,6 +32,7 @@ fun StudentDashboardScreen(
     user: User,
     uiState: StudentUiState,
     onNavigateToQuiz: (Quiz) -> Unit,
+    onNavigateToAttendance: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onSignOut: () -> Unit
 ) {
@@ -207,6 +208,58 @@ fun StudentDashboardScreen(
             }
 
             // Attendance Status Card
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToAttendance() },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Teal60.copy(alpha = 0.1f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Teal60.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.HowToReg,
+                                contentDescription = null,
+                                tint = Teal80,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Smart Attendance",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "Connect to teacher's device to mark present",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = TextMuted
+                        )
+                    }
+                }
+            }
 
 
             // Active Quizzes
