@@ -49,7 +49,7 @@ fun CreateQuizScreen(
     var questions by remember {
         mutableStateOf(
             listOf(
-                QuestionDraft("", mutableListOf("", "", "", ""), 0)
+                QuestionDraft("MCQ", "", mutableListOf("", "", "", ""), 0)
             )
         )
     }
@@ -255,7 +255,7 @@ fun CreateQuizScreen(
             item {
                 OutlinedButton(
                     onClick = {
-                        questions = questions + QuestionDraft("", mutableListOf("", "", "", ""), 0)
+                        questions = questions + QuestionDraft("MCQ", "", mutableListOf("", "", "", ""), 0)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -270,7 +270,7 @@ fun CreateQuizScreen(
             // Create Button
             item {
                 val isValid = title.isNotBlank() && selectedBatchIds.isNotEmpty() &&
-                        questions.all { it.text.isNotBlank() && it.options.all { o -> o.isNotBlank() } } &&
+                        questions.all { it.text.isNotBlank() && (it.type == "SUBJECTIVE" || it.options.all { o -> o.isNotBlank() }) } &&
                         startDate != null && endDate != null &&
                         (durationMinutes.toIntOrNull() ?: 0) > 0
 
@@ -280,7 +280,7 @@ fun CreateQuizScreen(
                             title,
                             description,
                             selectedBatchIds.toList(),
-                            questions.map { Question(it.text, it.options, it.correctOptionIndex) },
+                            questions.map { Question(it.type, it.text, it.options, it.correctOptionIndex) },
                             durationMinutes.toIntOrNull() ?: 30,
                             startDate!!,
                             endDate!!
@@ -324,6 +324,7 @@ fun SectionHeader(title: String) {
 }
 
 data class QuestionDraft(
+    val type: String = "MCQ",
     val text: String,
     val options: List<String>,
     val correctOptionIndex: Int
@@ -395,46 +396,76 @@ fun QuestionEditor(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                "Options (tap radio to mark correct answer)",
-                style = MaterialTheme.typography.labelMedium,
-                color = TextSecondary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = question.type == "MCQ",
+                    onClick = { onUpdate(question.copy(type = "MCQ")) },
+                    colors = RadioButtonDefaults.colors(selectedColor = Purple40)
+                )
+                Text("Multiple Choice", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                RadioButton(
+                    selected = question.type == "SUBJECTIVE",
+                    onClick = { onUpdate(question.copy(type = "SUBJECTIVE")) },
+                    colors = RadioButtonDefaults.colors(selectedColor = Purple40)
+                )
+                Text("Subjective", color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
+            if (question.type == "MCQ") {
+                Text(
+                    "Options (tap radio to mark correct answer)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
 
-            question.options.forEachIndexed { index, option ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = question.correctOptionIndex == index,
-                        onClick = { onUpdate(question.copy(correctOptionIndex = index)) },
-                        colors = RadioButtonDefaults.colors(
-                            selectedColor = SuccessGreen
+                Spacer(modifier = Modifier.height(8.dp))
+
+                question.options.forEachIndexed { index, option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = question.correctOptionIndex == index,
+                            onClick = { onUpdate(question.copy(correctOptionIndex = index)) },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = SuccessGreen
+                            )
                         )
-                    )
 
-                    OutlinedTextField(
-                        value = option,
-                        onValueChange = { newValue ->
-                            val newOptions = question.options.toMutableList()
-                            newOptions[index] = newValue
-                            onUpdate(question.copy(options = newOptions))
-                        },
-                        label = { Text("Option ${('A' + index)}") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (question.correctOptionIndex == index) SuccessGreen else Purple40,
-                            unfocusedBorderColor = TextMuted
+                        OutlinedTextField(
+                            value = option,
+                            onValueChange = { newValue ->
+                                val newOptions = question.options.toMutableList()
+                                newOptions[index] = newValue
+                                onUpdate(question.copy(options = newOptions))
+                            },
+                            label = { Text("Option ${('A' + index)}") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = if (question.correctOptionIndex == index) SuccessGreen else Purple40,
+                                unfocusedBorderColor = TextMuted
+                            )
                         )
-                    )
+                    }
                 }
+            } else {
+                Text(
+                    "Student will provide a text answer.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
             }
         }
     }

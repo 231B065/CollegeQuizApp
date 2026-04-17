@@ -35,6 +35,7 @@ fun TeacherDashboardScreen(
     onNavigateToCreateQuiz: () -> Unit,
     onNavigateToManageBatches: () -> Unit,
     onNavigateToQuizDetail: (Quiz) -> Unit,
+    onNavigateToRequests: () -> Unit,
     onSignOut: () -> Unit
 ) {
     val activeQuizzes = uiState.quizzes.filter { it.isActive }
@@ -163,6 +164,61 @@ fun TeacherDashboardScreen(
                                 "Create and view student batches",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = TextSecondary
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = TextMuted
+                        )
+                    }
+                }
+            }
+
+            // Student Requests Button
+            item {
+                val pendingCount = uiState.pendingStudents.size
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToRequests() },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = DarkSurfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(if (pendingCount > 0) WarningOrange.copy(alpha = 0.2f) else Purple40.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PersonAdd,
+                                contentDescription = null,
+                                tint = if (pendingCount > 0) WarningOrange else Purple60,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Student Requests",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                if (pendingCount > 0) "$pendingCount pending approval(s)" else "No pending requests",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (pendingCount > 0) WarningOrange else TextSecondary
                             )
                         }
                         Icon(

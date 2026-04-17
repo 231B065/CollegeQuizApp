@@ -45,12 +45,15 @@ class AuthRepository {
             val result = auth.createUserWithEmailAndPassword(email, password).await()
             val uid = result.user?.uid ?: throw Exception("Registration failed")
 
+            val isApproved = role == UserRole.TEACHER
+
             val user = User(
                 id = uid,
                 email = email,
                 name = name,
                 role = role,
-                batchId = batchId
+                batchId = batchId,
+                isApproved = isApproved
             )
 
             usersCollection.document(uid).set(
@@ -59,19 +62,10 @@ class AuthRepository {
                     "email" to user.email,
                     "name" to user.name,
                     "role" to user.role.name,
-                    "batchId" to user.batchId
+                    "batchId" to user.batchId,
+                    "isApproved" to user.isApproved
                 )
             ).await()
-
-            // Increment student count in batch if student
-            if (role == UserRole.STUDENT && batchId.isNotEmpty()) {
-                val batchRef = firestore.collection("batches").document(batchId)
-                firestore.runTransaction { transaction ->
-                    val snapshot = transaction.get(batchRef)
-                    val currentCount = snapshot.getLong("studentCount") ?: 0
-                    transaction.update(batchRef, "studentCount", currentCount + 1)
-                }.await()
-            }
 
             Result.success(user)
         } catch (e: Exception) {
@@ -93,7 +87,8 @@ class AuthRepository {
             } catch (e: Exception) {
                 UserRole.STUDENT
             },
-            batchId = doc.getString("batchId") ?: ""
+            batchId = doc.getString("batchId") ?: "",
+            isApproved = doc.getBoolean("isApproved") ?: true // Default to true for existing users
         )
     }
 
@@ -114,5 +109,64 @@ class AuthRepository {
      */
     fun signOut() {
         auth.signOut()
+    }
+
+    /**
+     * Get pending students for a list of batch IDs.
+     */
+    suspend fun getPendingStudents(batchIds: List<String>): Result<List<User>> {
+        return try {
+            if (batchIds.isEmpty()) return Result.success(emptyList())
+
+            // Firestore 'in' queries are limited to 10 items. For simplicity, assuming teacher has <= 10 batches.
+            // If they have more, we'd need to batch the queries.
+            val snapshot = usersCollection
+                .whereEqualTo("role", UserRole.STUDENT.name)
+                .whereEqualTo("isApproved", false)
+                .whereIn("batchId", batchIds)
+                .get()
+                .await()
+
+            val users = snapshot.documents.map { doc ->
+                User(
+                    id = doc.id,
+                    email = doc.getString("email") ?: "",
+                    name = doc.getString("name") ?: "",
+                    role = UserRole.STUDENT,
+                    batchId = doc.getString("batchId") ?: "",
+                    isApproved = false
+                )
+            }
+            Result.success(users)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Approve a student to join a batch.
+     */
+    suspend fun approveStudent(studentId: String, batchId: String): Result<Unit> {
+        return try {
+            val userRef = usersCollection.document(studentId)
+            val batchRef = firestore.collection("batches").document(batchId)
+
+            firestore.runTransaction { transaction ->
+                val userSnapshot = transaction.get(userRef)
+                if (userSnapshot.exists() && userSnapshot.getBoolean("isApproved") != true) {
+                    transaction.update(userRef, "isApproved", true)
+                    
+                    // Increment batch count
+                    val batchSnapshot = transaction.get(batchRef)
+                    if (batchSnapshot.exists()) {
+                        val currentCount = batchSnapshot.getLong("studentCount") ?: 0
+                        transaction.update(batchRef, "studentCount", currentCount + 1)
+                    }
+                }
+            }.await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

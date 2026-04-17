@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
+import com.college.quizapp.BuildConfig
+import com.google.ai.client.generativeai.GenerativeModel
 
 /**
  * Handles all quiz, batch, and result operations with Firestore.
@@ -116,6 +118,7 @@ class QuizRepository {
                 "batchIds" to batchIds,
                 "questions" to questions.map { q ->
                     hashMapOf(
+                        "type" to q.type,
                         "text" to q.text,
                         "options" to q.options,
                         "correctOptionIndex" to q.correctOptionIndex
@@ -221,7 +224,7 @@ class QuizRepository {
         studentId: String,
         studentName: String,
         batchId: String,
-        answers: Map<String, Int>,
+        answers: Map<String, String>,
         questions: List<Question>,
         wasAutoSubmitted: Boolean = false
     ): Result<QuizResult> {
@@ -241,8 +244,45 @@ class QuizRepository {
             var score = 0
             for ((index, answer) in answers) {
                 val qIndex = index.toIntOrNull() ?: continue
-                if (qIndex < questions.size && questions[qIndex].correctOptionIndex == answer) {
-                    score++
+                if (qIndex < questions.size && questions[qIndex].type == "MCQ") {
+                    val selectedOption = answer.toIntOrNull()
+                    if (selectedOption != null && questions[qIndex].correctOptionIndex == selectedOption) {
+                        score++
+                    }
+                }
+            }
+
+            // AI Check for subjective questions
+            val aiFeedback = mutableMapOf<String, String>()
+            if (BuildConfig.GEMINI_API_KEY.isNotEmpty()) {
+                try {
+                    val generativeModel = GenerativeModel(
+                        modelName = "gemini-1.5-flash",
+                        apiKey = BuildConfig.GEMINI_API_KEY
+                    )
+
+                    for ((index, answer) in answers) {
+                        val qIndex = index.toIntOrNull() ?: continue
+                        if (qIndex < questions.size && questions[qIndex].type == "SUBJECTIVE") {
+                            if (answer.isNotBlank()) {
+                                try {
+                                    val prompt = "Evaluate the following student answer for a college-level quiz.\n" +
+                                            "Question: ${questions[qIndex].text}\n" +
+                                            "Student's Answer: $answer\n" +
+                                            "If the answer is essentially correct and complete, reply only with 'Correct'.\n" +
+                                            "If the answer is incorrect or incomplete, provide brief, constructive feedback explaining what is wrong or missing. Keep it under 2 sentences."
+                                    val response = generativeModel.generateContent(prompt)
+                                    aiFeedback[index] = response.text ?: "Could not generate feedback."
+                                } catch (e: Exception) {
+                                    aiFeedback[index] = "Error evaluating answer."
+                                }
+                            } else {
+                                aiFeedback[index] = "No answer provided."
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    // API key might be missing or invalid
                 }
             }
 
@@ -258,7 +298,8 @@ class QuizRepository {
                 score = score,
                 totalQuestions = questions.size,
                 submittedAt = Timestamp.now(),
-                wasAutoSubmitted = wasAutoSubmitted
+                wasAutoSubmitted = wasAutoSubmitted,
+                aiFeedback = aiFeedback
             )
 
             docRef.set(
@@ -273,7 +314,8 @@ class QuizRepository {
                     "score" to result.score,
                     "totalQuestions" to result.totalQuestions,
                     "submittedAt" to result.submittedAt,
-                    "wasAutoSubmitted" to result.wasAutoSubmitted
+                    "wasAutoSubmitted" to result.wasAutoSubmitted,
+                    "aiFeedback" to result.aiFeedback
                 )
             ).await()
 
@@ -302,11 +344,12 @@ class QuizRepository {
                         studentId = doc.getString("studentId") ?: "",
                         studentName = doc.getString("studentName") ?: "",
                         batchId = doc.getString("batchId") ?: "",
-                        answers = (doc.get("answers") as? Map<String, Long>)?.mapValues { it.value.toInt() } ?: emptyMap(),
+                        answers = (doc.get("answers") as? Map<String, Any>)?.mapValues { it.value.toString() } ?: emptyMap(),
                         score = (doc.getLong("score") ?: 0).toInt(),
                         totalQuestions = (doc.getLong("totalQuestions") ?: 0).toInt(),
                         submittedAt = doc.getTimestamp("submittedAt"),
-                        wasAutoSubmitted = doc.getBoolean("wasAutoSubmitted") ?: false
+                        wasAutoSubmitted = doc.getBoolean("wasAutoSubmitted") ?: false,
+                        aiFeedback = (doc.get("aiFeedback") as? Map<String, Any>)?.mapValues { it.value.toString() } ?: emptyMap()
                     )
                 } ?: emptyList()
                 trySend(results)
@@ -333,11 +376,12 @@ class QuizRepository {
                         studentId = doc.getString("studentId") ?: "",
                         studentName = doc.getString("studentName") ?: "",
                         batchId = doc.getString("batchId") ?: "",
-                        answers = (doc.get("answers") as? Map<String, Long>)?.mapValues { it.value.toInt() } ?: emptyMap(),
+                        answers = (doc.get("answers") as? Map<String, Any>)?.mapValues { it.value.toString() } ?: emptyMap(),
                         score = (doc.getLong("score") ?: 0).toInt(),
                         totalQuestions = (doc.getLong("totalQuestions") ?: 0).toInt(),
                         submittedAt = doc.getTimestamp("submittedAt"),
-                        wasAutoSubmitted = doc.getBoolean("wasAutoSubmitted") ?: false
+                        wasAutoSubmitted = doc.getBoolean("wasAutoSubmitted") ?: false,
+                        aiFeedback = (doc.get("aiFeedback") as? Map<String, Any>)?.mapValues { it.value.toString() } ?: emptyMap()
                     )
                 } ?: emptyList()
                 trySend(results)
@@ -368,6 +412,7 @@ class QuizRepository {
         val questionsRaw = doc.get("questions") as? List<Map<String, Any>> ?: emptyList()
         val questions = questionsRaw.map { q ->
             Question(
+                type = q["type"] as? String ?: "MCQ",
                 text = q["text"] as? String ?: "",
                 options = q["options"] as? List<String> ?: emptyList(),
                 correctOptionIndex = (q["correctOptionIndex"] as? Long ?: 0).toInt()

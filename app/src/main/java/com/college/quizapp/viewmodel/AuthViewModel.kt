@@ -119,6 +119,24 @@ class AuthViewModel : ViewModel() {
     }
 
     /**
+     * Refresh the user profile from Firestore.
+     */
+    fun refreshUser() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val user = authRepository.getCurrentUser()
+            if (user != null) {
+                _uiState.value = _uiState.value.copy(
+                    user = user,
+                    isLoading = false
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+            }
+        }
+    }
+
+    /**
      * Sign out the current user.
      */
     fun signOut() {

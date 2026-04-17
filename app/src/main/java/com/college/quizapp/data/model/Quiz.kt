@@ -26,9 +26,10 @@ data class Quiz(
  * Represents a single MCQ question with 4 options.
  */
 data class Question(
+    val type: String = "MCQ", // "MCQ" or "SUBJECTIVE"
     val text: String = "",
     val options: List<String> = emptyList(),
     val correctOptionIndex: Int = 0
 ) {
-    constructor() : this("", emptyList(), 0)
+    constructor() : this("MCQ", "", emptyList(), 0)
 }

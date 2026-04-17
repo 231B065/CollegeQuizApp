@@ -6,9 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.college.quizapp.ble.BLEBeaconAdvertiser
 import com.college.quizapp.data.model.Batch
 import com.college.quizapp.data.model.Question
+import com.college.quizapp.data.model.User
 import com.college.quizapp.data.model.Quiz
 import com.college.quizapp.data.model.QuizResult
 import com.college.quizapp.data.repository.QuizRepository
+import com.college.quizapp.data.repository.AuthRepository
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,12 +26,14 @@ data class TeacherUiState(
     val quizResults: List<QuizResult> = emptyList(),
     val error: String? = null,
     val successMessage: String? = null,
-    val isAdvertising: Boolean = false
+    val isAdvertising: Boolean = false,
+    val pendingStudents: List<User> = emptyList()
 )
 
 class TeacherViewModel : ViewModel() {
 
     private val quizRepository = QuizRepository()
+    private val authRepository = AuthRepository()
     private var bleAdvertiser: BLEBeaconAdvertiser? = null
 
     private val _uiState = MutableStateFlow(TeacherUiState())
@@ -75,6 +79,48 @@ class TeacherViewModel : ViewModel() {
                         error = e.message,
                         isLoading = false
                     )
+                }
+            )
+        }
+    }
+
+    /**
+     * Load pending students for all of the teacher's batches.
+     */
+    fun loadPendingStudents() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            // Extract batch IDs from loaded batches
+            val batchIds = _uiState.value.batches.map { it.id }
+            val result = authRepository.getPendingStudents(batchIds)
+            result.fold(
+                onSuccess = { students ->
+                    _uiState.value = _uiState.value.copy(pendingStudents = students, isLoading = false)
+                },
+                onFailure = { e ->
+                    _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
+                }
+            )
+        }
+    }
+
+    /**
+     * Approve a student request.
+     */
+    fun approveStudent(studentId: String, batchId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val result = authRepository.approveStudent(studentId, batchId)
+            result.fold(
+                onSuccess = {
+                    _uiState.value = _uiState.value.copy(
+                        successMessage = "Student approved successfully",
+                        isLoading = false
+                    )
+                    loadPendingStudents() // Refresh list
+                },
+                onFailure = { e ->
+                    _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
                 }
             )
         }

@@ -17,12 +17,13 @@ data class StudentUiState(
     val quizzes: List<Quiz> = emptyList(),
     val results: List<QuizResult> = emptyList(),
     val currentQuiz: Quiz? = null,
-    val currentAnswers: MutableMap<String, Int> = mutableMapOf(),
+    val currentAnswers: MutableMap<String, String> = mutableMapOf(),
     val currentQuestionIndex: Int = 0,
     val isInBLERange: Boolean = false,
     val isBLEScanning: Boolean = false,
     val quizSubmitted: Boolean = false,
     val submissionResult: QuizResult? = null,
+    val selectedResult: QuizResult? = null,
     val error: String? = null,
     val timeRemainingSeconds: Long = 0L
 )
@@ -35,18 +36,12 @@ class StudentViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(StudentUiState())
     val uiState: StateFlow<StudentUiState> = _uiState
 
-    /**
-     * Initialize BLE scanner with context.
-     */
     fun initBLE(context: Context) {
         if (bleScanner == null) {
             bleScanner = BLEBeaconScanner(context.applicationContext)
         }
     }
 
-    /**
-     * Load quizzes available for student's batch.
-     */
     fun loadQuizzes(batchId: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
@@ -60,9 +55,21 @@ class StudentViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Load student's past quiz results.
-     */
+    fun loadQuizDetails(quizId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val result = quizRepository.getQuiz(quizId)
+            result.fold(
+                onSuccess = { quiz ->
+                    _uiState.value = _uiState.value.copy(currentQuiz = quiz, isLoading = false)
+                },
+                onFailure = { e ->
+                    _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
+                }
+            )
+        }
+    }
+
     fun loadResults(studentId: String) {
         viewModelScope.launch {
             quizRepository.getStudentResultsFlow(studentId)
@@ -75,9 +82,6 @@ class StudentViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Start BLE scan to verify student is in range of teacher's beacon.
-     */
     fun startBLEVerification(bleSessionId: String) {
         val scanner = bleScanner ?: return
         scanner.startScanning(bleSessionId)
@@ -85,18 +89,6 @@ class StudentViewModel : ViewModel() {
         viewModelScope.launch {
             scanner.isInRange.collect { inRange ->
                 _uiState.value = _uiState.value.copy(isInBLERange = inRange)
-
-                // Auto-submit if beacon lost during exam
-                if (!inRange && _uiState.value.currentQuiz != null && !_uiState.value.quizSubmitted) {
-                    val quiz = _uiState.value.currentQuiz
-                    if (quiz != null && _uiState.value.currentAnswers.isNotEmpty()) {
-                        // Only auto-submit if we were previously in range (beacon lost)
-                        if (_uiState.value.isBLEScanning && scanner.isBeaconAlive().not() &&
-                            _uiState.value.currentAnswers.isNotEmpty()) {
-                            // We'll handle auto-submit from the UI layer with studentId/name context
-                        }
-                    }
-                }
             }
         }
 
@@ -107,17 +99,14 @@ class StudentViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Stop BLE scanning.
-     */
     fun stopBLEVerification() {
         bleScanner?.stopScanning()
-        _uiState.value = _uiState.value.copy(isInBLERange = false, isBLEScanning = false)
+        _uiState.value = _uiState.value.copy(
+            isInBLERange = false,
+            isBLEScanning = false
+        )
     }
 
-    /**
-     * Start taking a quiz.
-     */
     fun startQuiz(quiz: Quiz) {
         _uiState.value = _uiState.value.copy(
             currentQuiz = quiz,
@@ -129,18 +118,12 @@ class StudentViewModel : ViewModel() {
         )
     }
 
-    /**
-     * Select an answer for the current question.
-     */
-    fun selectAnswer(questionIndex: Int, optionIndex: Int) {
+    fun selectAnswer(questionIndex: Int, answer: String) {
         val answers = _uiState.value.currentAnswers.toMutableMap()
-        answers[questionIndex.toString()] = optionIndex
-        _uiState.value = _uiState.value.copy(currentAnswers = answers.toMutableMap())
+        answers[questionIndex.toString()] = answer
+        _uiState.value = _uiState.value.copy(currentAnswers = answers)
     }
 
-    /**
-     * Navigate to next question.
-     */
     fun nextQuestion() {
         val quiz = _uiState.value.currentQuiz ?: return
         val current = _uiState.value.currentQuestionIndex
@@ -149,9 +132,6 @@ class StudentViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Navigate to previous question.
-     */
     fun previousQuestion() {
         val current = _uiState.value.currentQuestionIndex
         if (current > 0) {
@@ -159,23 +139,14 @@ class StudentViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Jump to a specific question.
-     */
     fun goToQuestion(index: Int) {
         _uiState.value = _uiState.value.copy(currentQuestionIndex = index)
     }
 
-    /**
-     * Update remaining time.
-     */
     fun updateTimeRemaining(seconds: Long) {
         _uiState.value = _uiState.value.copy(timeRemainingSeconds = seconds)
     }
 
-    /**
-     * Submit the quiz.
-     */
     fun submitQuiz(
         studentId: String,
         studentName: String,
@@ -218,16 +189,15 @@ class StudentViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Check if student already submitted this quiz.
-     */
+    fun selectResultForDetails(result: QuizResult) {
+        _uiState.value = _uiState.value.copy(selectedResult = result)
+        loadQuizDetails(result.quizId)
+    }
+
     suspend fun hasAlreadySubmitted(quizId: String, studentId: String): Boolean {
         return quizRepository.hasStudentSubmitted(quizId, studentId)
     }
 
-    /**
-     * Reset quiz state after finishing.
-     */
     fun resetQuizState() {
         _uiState.value = _uiState.value.copy(
             currentQuiz = null,

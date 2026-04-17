@@ -36,14 +36,15 @@ fun TakeQuizScreen(
     user: User,
     quiz: Quiz,
     uiState: StudentUiState,
-    onSelectAnswer: (Int, Int) -> Unit,
+    onSelectAnswer: (Int, String) -> Unit,
     onNextQuestion: () -> Unit,
     onPreviousQuestion: () -> Unit,
     onGoToQuestion: (Int) -> Unit,
     onSubmitQuiz: (Boolean) -> Unit,
     onStartBLEVerification: (String) -> Unit,
     onNavigateBack: () -> Unit,
-    onUpdateTime: (Long) -> Unit
+    onUpdateTime: (Long) -> Unit,
+    onNavigateToDetails: () -> Unit
 ) {
     var showSubmitDialog by remember { mutableStateOf(false) }
     var bleCheckStarted by remember { mutableStateOf(false) }
@@ -87,6 +88,7 @@ fun TakeQuizScreen(
     if (uiState.quizSubmitted && uiState.submissionResult != null) {
         QuizSubmittedScreen(
             result = uiState.submissionResult,
+            onViewDetails = onNavigateToDetails,
             onDone = onNavigateBack
         )
         return
@@ -299,66 +301,87 @@ fun TakeQuizScreen(
                 // Options
                 val selectedOption = uiState.currentAnswers[uiState.currentQuestionIndex.toString()]
 
-                currentQuestion.options.forEachIndexed { index, option ->
-                    val isSelected = selectedOption == index
+                if (currentQuestion.type == "MCQ") {
+                    currentQuestion.options.forEachIndexed { index, option ->
+                        val isSelected = selectedOption == index.toString()
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clickable {
-                                onSelectAnswer(uiState.currentQuestionIndex, index)
-                            },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) Purple40.copy(alpha = 0.15f) else DarkSurfaceVariant
-                        ),
-                        border = if (isSelected) {
-                            androidx.compose.foundation.BorderStroke(2.dp, Purple40)
-                        } else null
-                    ) {
-                        Row(
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(vertical = 4.dp)
+                                .clickable {
+                                    onSelectAnswer(uiState.currentQuestionIndex, index.toString())
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) Purple40.copy(alpha = 0.15f) else DarkSurfaceVariant
+                            ),
+                            border = if (isSelected) {
+                                androidx.compose.foundation.BorderStroke(2.dp, Purple40)
+                            } else null
                         ) {
-                            Box(
+                            Row(
                                 modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (isSelected) Purple40 else DarkCard
-                                    ),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isSelected) Purple40 else DarkCard
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "${'A' + index}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
                                 Text(
-                                    "${'A' + index}",
-                                    style = MaterialTheme.typography.titleSmall,
+                                    option,
+                                    style = MaterialTheme.typography.bodyLarge,
                                     color = TextPrimary,
-                                    fontWeight = FontWeight.Bold
+                                    modifier = Modifier.weight(1f)
                                 )
-                            }
 
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Text(
-                                option,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = TextPrimary,
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            if (isSelected) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = Purple40,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Purple40,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             }
                         }
                     }
+                } else {
+                    OutlinedTextField(
+                        value = selectedOption ?: "",
+                        onValueChange = { newValue ->
+                            onSelectAnswer(uiState.currentQuestionIndex, newValue)
+                        },
+                        label = { Text("Your Answer") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Purple40,
+                            unfocusedBorderColor = TextMuted,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        maxLines = 5
+                    )
                 }
 
                 // Answered count
@@ -496,6 +519,7 @@ fun BLEVerificationScreen(
 @Composable
 fun QuizSubmittedScreen(
     result: QuizResult,
+    onViewDetails: () -> Unit,
     onDone: () -> Unit
 ) {
     val percentage = if (result.totalQuestions > 0)
@@ -577,14 +601,26 @@ fun QuizSubmittedScreen(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = onDone,
+                    onClick = onViewDetails,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Purple40)
+                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
                 ) {
-                    Text("Back to Dashboard", fontWeight = FontWeight.Bold)
+                    Text("View Detailed Feedback", color = DarkBackground, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = onDone,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Back to Dashboard", color = TextPrimary, fontWeight = FontWeight.Bold)
                 }
             }
         }

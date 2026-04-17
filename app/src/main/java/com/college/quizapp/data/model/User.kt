@@ -8,10 +8,11 @@ data class User(
     val email: String = "",
     val name: String = "",
     val role: UserRole = UserRole.STUDENT,
-    val batchId: String = ""
+    val batchId: String = "",
+    val isApproved: Boolean = false
 ) {
     // No-arg constructor for Firestore deserialization
-    constructor() : this("", "", "", UserRole.STUDENT, "")
+    constructor() : this("", "", "", UserRole.STUDENT, "", true) // Default true for existing users parsed by reflection
 }
 
 enum class UserRole {

@@ -206,6 +206,9 @@ fun StudentDashboardScreen(
                 }
             }
 
+            // Attendance Status Card
+
+
             // Active Quizzes
             if (activeQuizzes.isNotEmpty()) {
                 item {
