@@ -81,7 +81,7 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "College Quiz",
+                        text = "AttendIQ",
                         style = MaterialTheme.typography.displayMedium,
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold
